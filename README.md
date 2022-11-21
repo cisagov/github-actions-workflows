@@ -7,8 +7,33 @@ for use in our organization's GitHub Actions workflows.
 
 ## Workflows available ##
 
-- [common-lint.yml](.github/workflows/common-lint.yml): The standard linting
-  workflow for our projects.
+- [common-lint.yml](#common-lintyml)
+
+### [common-lint.yml](.github/workflows/common-lint.yml) ##
+
+The standard linting workflow for our projects.
+
+#### Inputs ####
+
+| Name | Description | Type | Default | Required |
+| ---- | ----------- | ---- | ------- | -------- |
+| go-version | The version of [Go](https://github.com/golang/go) to use in the workflow. | `string` | `"1.19"` | no |
+| packer-version | The version of [Packer](https://github.com/hashicorp/packer) to use instead of what is provided by [cisagov/setup-env-github-action]. | `string` | `""` | no |
+| python-version | The version of [Python](https://github.com/python/cpython) to use in the workflow. | `string` | `"3.10"` | no |
+| run-tmate | Start a workflow debugging session with [mxschmitt/action-tmate](https://github.com/mxschmitt/action-tmate). | `boolean` | `false` | no |
+| shfmt-version | The version of [shfmt](https://github.com/mvdan/sh#shfmt) to use instead of what is provided by [cisagov/setup-env-github-action]. | `string` | `""` | no |
+| terraform-version | The version of [Terraform](https://github.com/hashicorp/terraform) to use instead of what is provided by [cisagov/setup-env-github-action]. | `string` | `""` | no |
+| terraform-docs-version | The version of [terraform-docs](https://github.com/terraform-docs/terraform-docs) to use instead of what is provided by [cisagov/setup-env-github-action]. | `string` | `""` | no |
+
+#### Secrets ####
+
+Workflow accepts no secrets.
+
+<!--
+| Name | Description | Required |
+| ---- | ----------- | -------- |
+| Secret name | Secret description | Is it required? |
+-->
 
 ## Contributing ##
 
@@ -27,3 +52,5 @@ dedication](https://creativecommons.org/publicdomain/zero/1.0/).
 All contributions to this project will be released under the CC0
 dedication. By submitting a pull request, you are agreeing to comply
 with this waiver of copyright interest.
+
+[cisagov/setup-env-github-action]: https://github.com/cisagov/setup-env-github-action

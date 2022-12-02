@@ -128,15 +128,15 @@ jobs:
         with:
           terraform_version: ${{ needs.get_tool_versions.outputs.terraform-version }}
       - name: Install shfmt
-        env:
-          PACKAGE_URL: mvdan.cc/sh/v3/cmd/shfmt
-          PACKAGE_VERSION: ${{ needs.get_tool_versions.outputs.shfmt-version }}
-        run: go install ${PACKAGE_URL}@${PACKAGE_VERSION}
+        uses: cisagov/setup-go-package@v0
+        with:
+          source: mvdan.cc/sh/v3/cmd/shfmt
+          version: ${{ needs.get_tool_versions.outputs.shfmt-version }}
       - name: Install Terraform-docs
-        env:
-          PACKAGE_URL: github.com/terraform-docs/terraform-docs
-          PACKAGE_VERSION: ${{ needs.get_tool_versions.outputs.terraform-docs-version }}
-        run: go install ${PACKAGE_URL}@${PACKAGE_VERSION}
+        uses: cisagov/setup-go-package@v0
+        with:
+          source: github.com/terraform-docs/terraform-docs
+          version: ${{ needs.get_tool_versions.outputs.terraform-docs-version }}
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

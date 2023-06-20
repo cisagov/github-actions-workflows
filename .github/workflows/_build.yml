@@ -1,11 +1,22 @@
 ---
-name: build
+name: "Build"
 
 on:
   push:
+    branches:
+      - '**'
   pull_request:
-  repository_dispatch:
-    types: [apb]
+  release:
+    types:
+      - edited
+      - published
+  schedule:
+    - cron: '0 10 * * *'  # everyday at 10am
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
 
 env:
   CURL_CACHE_DIR: ~/.cache/curl
@@ -14,7 +25,14 @@ env:
   RUN_TMATE: ${{ secrets.RUN_TMATE }}
 
 jobs:
+  config:
+    name: "Config"
+    uses: ./.github/workflows/_config.yml
+
   lint:
+    name: "Lint"
+    needs:
+      - config
     runs-on: ubuntu-latest
     steps:
       - id: setup-env
@@ -24,6 +42,7 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
+      - uses: ./.github/workflows/common-lint.yml
       # We need the Go version and Go cache location for the actions/cache step,
       # so the Go installation must happen before that.
       - id: setup-go

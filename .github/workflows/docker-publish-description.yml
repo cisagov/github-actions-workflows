@@ -1,0 +1,48 @@
+---
+name: "Publish README"
+
+# This reusable workflow publishes the description of a Docker image to the
+# Docker Hub.
+
+on:
+  workflow_call:
+    inputs:
+      # Required inputs
+      image_name:
+        description: "The Docker image name"
+        required: true
+        type: string
+      # Optional inputs
+      filepath:
+        default: ./README.md
+        description: "The path to the file to publish"
+        required: false
+        type: string
+    secrets:
+      docker_password:
+        description: "The password for the Docker hub account"
+        required: true
+      docker_username:
+        description: "The username for the Docker hub account"
+        required: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2.4.1
+        with:
+          egress-policy: audit  # TODO: change to 'egress-policy: block' after couple of runs
+
+      - name: Checkout
+        uses: actions/checkout@3.5.3
+
+      - name: Docker Hub Description
+        uses: peter-evans/dockerhub-description@3.4.2
+        with:
+          password: ${{ secrets.docker_password }}
+          readme-filepath: ${{ inputs.filepath }}
+          repository: ${{ inputs.image_name }}
+          short-description: ${{ github.event.repository.description }}
+          username: ${{ secrets.docker_username }}

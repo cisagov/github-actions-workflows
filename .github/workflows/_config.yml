@@ -16,7 +16,10 @@ jobs:
           allowed-endpoints: >
             azure.archive.ubuntu.com:443
             azure.archive.ubuntu.com:80
+            esm.ubuntu.com:443
+            motd.ubuntu.com:443
             packages.microsoft.com:443
+            ppa.launchpadcontent.net:443
             www.githubstatus.com:443
 
       - name: Check GitHub Status

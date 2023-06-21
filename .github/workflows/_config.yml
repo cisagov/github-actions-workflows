@@ -16,6 +16,7 @@ jobs:
           allowed-endpoints: >
             azure.archive.ubuntu.com:443
             azure.archive.ubuntu.com:80
+            13.107.43.16:80
             esm.ubuntu.com:443
             motd.ubuntu.com:443
             packages.microsoft.com:443

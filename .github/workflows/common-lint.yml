@@ -77,7 +77,8 @@ jobs:
       - name: Store installed Go version
         id: go-version
         run: |
-          echo version=$(go version | sed 's/^go version go\([0-9.]\+\) .*/\1/') >> $GITHUB_OUTPUT
+          echo version=$(go version | \
+          sed 's/^go version go\([0-9.]\+\) .*/\1/') >> $GITHUB_OUTPUT
 
       - name: Lookup Go cache directory
         id: go-cache

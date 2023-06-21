@@ -62,12 +62,15 @@ jobs:
         id: clean
         run: |
           # Replace illegal characters in repository name
-          echo repository=$(echo "${{ github.repository }}" | sed -e 's/[^a-zA-Z0-9._-]/_/g') >> $GITHUB_OUTPUT
+          echo repository=$(echo "${{ github.repository }}" \
+          | sed -e 's/[^a-zA-Z0-9._-]/_/g') >> $GITHUB_OUTPUT
           # Replace illegal characters in ref_name
-          echo ref_name=$(echo "${{ github.ref_name }}" | sed -e 's/[^a-zA-Z0-9._-]/_/g') >> $GITHUB_OUTPUT
+          echo ref_name=$(echo "${{ github.ref_name }}" \
+          | sed -e 's/[^a-zA-Z0-9._-]/_/g') >> $GITHUB_OUTPUT
 
       - name: Calculate file variables
-        # If this is a release, the version will be the clean ref_name.  Otherwise it will be the short SHA.
+        # If this is a release, the version will be the clean ref_name.
+        # Otherwise it will be the short SHA.
         id: calc
         run: |
           if [[ "${{ github.ref }}" == "refs/tags/"* ]]; then
@@ -85,9 +88,11 @@ jobs:
         run: |
           for image_archive in $(find . -name "*.tar"); do
             platform=$(basename $image_archive .tar)
-            filename=${{ steps.clean.outputs.repository }}-${platform}-${{ steps.calc.outputs.version }}-sbom.spdx.json
+            filename=${{ steps.clean.outputs.repository }}-\
+            ${platform}-${{ steps.calc.outputs.version }}-sbom.spdx.json
             echo "::group::Generating SBOM $filename for $image_archive"
-            syft --verbose=2 --output spdx-json $image_archive > ${{ env.OUTPUT_ARTIFACT_WORK_DIR }}/$filename
+            syft --verbose=2 --output spdx-json $image_archive > \
+            ${{ env.OUTPUT_ARTIFACT_WORK_DIR }}/$filename
             echo "::endgroup::"
           done
 
@@ -109,4 +114,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ github.ref_name }} ${{ env.OUTPUT_ARTIFACT_WORK_DIR }}/* --clobber
+          gh release upload ${{ github.ref_name }} \
+          ${{ env.OUTPUT_ARTIFACT_WORK_DIR }}/* --clobber

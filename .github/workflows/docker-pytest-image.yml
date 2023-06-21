@@ -81,7 +81,8 @@ jobs:
         id: clean
         run: |
           # Replace illegal characters in image archive name
-          echo image_archive_name=$(echo "${{ inputs.image_archive_name }}" | sed -e 's/[^a-zA-Z0-9._-]/_/g') >> $GITHUB_OUTPUT
+          echo image_archive_name=$(echo "${{ inputs.image_archive_name }}" \
+          | sed -e 's/[^a-zA-Z0-9._-]/_/g') >> $GITHUB_OUTPUT
 
       - name: Check if data artifact key is available
         id: check_data_archive_key
@@ -133,10 +134,12 @@ jobs:
 
       - name: Load image
         run: |
-          archive="${{ env.ARTIFACT_WORK_DIR }}/${{ steps.clean.outputs.image_archive_name }}"
+          archive="${{ env.ARTIFACT_WORK_DIR }}/ \
+          ${{ steps.clean.outputs.image_archive_name }}"
           # If the filename ends in 7z, then decrypt it first
           if [[ "${archive}" == *".7z" ]]; then
-              load_output=$(7za x -p${{ secrets.image_archive_key }} -so "${archive}" | docker load)
+              load_output=$(7za x -p${{ secrets.image_archive_key }} \
+               -so "${archive}" | docker load)
           else
               load_output=$(docker load -i "${archive}")
           fi
@@ -159,21 +162,25 @@ jobs:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           set -o pipefail
-          pytest --image-tag ${{ env.TEST_IMAGE_TAG }} | tee ${{ inputs.data_artifact_path }}/pytest.log
+          pytest --image-tag ${{ env.TEST_IMAGE_TAG }} | \
+          tee ${{ inputs.data_artifact_path }}/pytest.log
 
       - name: Compress data directory unencrypted
-        if: ( success() || failure() ) && steps.check_data_archive_key.outputs.do_encryption == 'false'
+        if: ( success() || failure() ) && \
+         steps.check_data_archive_key.outputs.do_encryption == 'false'
         run: |
           tar cf data.tar.gz ${{ inputs.data_artifact_path }}
 
       - name: Compress and encrypt data directory
-        if: ( success() || failure() ) && steps.check_data_archive_key.outputs.do_encryption == 'true'
+        if: ( success() || failure() ) && \
+         steps.check_data_archive_key.outputs.do_encryption == 'true'
         run: |
           tar cf - ${{ inputs.data_artifact_path }} | \
           7za a -p${{ secrets.data_archive_key }} -si data.tar.7z
 
       - name: Upload unencrypted data artifacts
-        if: ( success() || failure() ) && steps.check_data_archive_key.outputs.do_encryption == 'false'
+        if: ( success() || failure() ) && \
+         steps.check_data_archive_key.outputs.do_encryption == 'false'
         uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce
         with:
           name: ${{ inputs.data_artifact_name }}
@@ -181,7 +188,8 @@ jobs:
           retention-days: ${{ inputs.data_artifact_retention_days }}
 
       - name: Upload encrypted data artifacts
-        if: ( success() || failure() ) && steps.check_data_archive_key.outputs.do_encryption == 'true'
+        if: ( success() || failure() ) && \
+         steps.check_data_archive_key.outputs.do_encryption == 'true'
         uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce
         with:
           name: ${{ inputs.data_artifact_name }}

@@ -100,7 +100,8 @@ jobs:
               echo "::group::Loading image from $archive"
               # If the filename ends in 7z, then decrypt it first
               if [[ "${archive}" == *".7z" ]]; then
-                  load_output=$(7za x -p${{ secrets.image_archive_key }} -so "${archive}" | docker load)
+                  load_output=$(7za x -p${{ secrets.image_archive_key }} \
+                  -so "${archive}" | docker load)
               else
                   load_output=$(docker load -i "${archive}")
               fi

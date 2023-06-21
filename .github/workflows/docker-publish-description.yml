@@ -33,7 +33,8 @@ jobs:
       - name: Harden Runner
         uses: step-security/harden-runner@v2.4.1
         with:
-          egress-policy: audit  # TODO: change to 'egress-policy: block' after couple of runs
+          egress-policy: audit  # TODO: change to 'egress-policy:
+                                # block' after couple of runs
 
       - name: Checkout
         uses: actions/checkout@3.5.3

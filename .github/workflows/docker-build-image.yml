@@ -33,7 +33,9 @@ on:
         type: number
       cache_from_scopes:
         default: "buildkit"
-        description: "The GitHub Action Cache scopes to read from (name will be cleaned, CSV)"
+        description: >
+         "The GitHub Action Cache scopes to read
+         from (name will be cleaned, CSV)"
         required: false
         type: string
       cache_to_scope:
@@ -203,13 +205,17 @@ jobs:
         id: clean
         run: |
           # Replace illegal characters in cache from scope list
-          echo cache_from_scopes=$(echo "${{ inputs.cache_from_scopes }}" | sed -e 's/[^a-zA-Z0-9.,_-]/_/g') >> $GITHUB_OUTPUT
+          echo cache_from_scopes=$(echo "${{ inputs.cache_from_scopes }}" \
+          | sed -e 's/[^a-zA-Z0-9.,_-]/_/g') >> $GITHUB_OUTPUT
           # Replace illegal characters in cache to scope
-          echo cache_to_scope=$(echo "${{ inputs.cache_to_scope }}" | sed -e 's/[^a-zA-Z0-9._-]/_/g') >> $GITHUB_OUTPUT
+          echo cache_to_scope=$(echo "${{ inputs.cache_to_scope }}" \
+          | sed -e 's/[^a-zA-Z0-9._-]/_/g') >> $GITHUB_OUTPUT
           # Replace illegal characters in image archive name
-          echo image_archive_name_stem=$(echo "${{ inputs.image_archive_name_stem }}" | sed -e 's/[^a-zA-Z0-9._-]/_/g') >> $GITHUB_OUTPUT
+          echo image_archive_name_stem=$(echo "${{ inputs.image_archive_name_stem }}" \
+          | sed -e 's/[^a-zA-Z0-9._-]/_/g') >> $GITHUB_OUTPUT
           # Replace illegal characters in tag suffix
-          echo suffix=$(echo "${{ inputs.tag_suffix }}" | sed -e 's/[^a-zA-Z0-9._-]/_/g') >> $GITHUB_OUTPUT
+          echo suffix=$(echo "${{ inputs.tag_suffix }}" \
+          | sed -e 's/[^a-zA-Z0-9._-]/_/g') >> $GITHUB_OUTPUT
 
       - name: Add suffix to image tags
         id: tag_suffix
@@ -218,7 +224,9 @@ jobs:
           echo "tags<<${delimiter}" >> $GITHUB_OUTPUT
           # if tag_suffix is set, append it to each tag
           if [[ -n "${{ inputs.tag_suffix }}" ]]; then
-            echo "${{ inputs.image_tags }}" | sed -e "s/$/-${{ steps.clean.outputs.suffix }}/" >> $GITHUB_OUTPUT
+            echo "${{ inputs.image_tags }}" | \
+            sed -e "s/$/-${{ steps.clean.outputs.suffix }}/" \
+            >> $GITHUB_OUTPUT
           else
             echo "${{ inputs.image_tags }}" >> $GITHUB_OUTPUT
           fi
@@ -260,16 +268,20 @@ jobs:
       - name: Calculate GitHub Actions cache scopes
         id: cache_scopes
         run: |
-          # Create a list of cache object lines from the cleaned cache scope CSV
+          # Create a list of cache object lines \
+          from the cleaned cache scope CSV
           delimiter="$(openssl rand -hex 8)"
           echo "from<<${delimiter}" >> $GITHUB_OUTPUT
-          for scope in $(echo ${{ steps.clean.outputs.cache_from_scopes }} | tr "," " "); do
+          for scope in $(echo ${{ steps.clean.outputs.cache_from_scopes }} \
+           | tr "," " "); do
             echo "type=gha,scope=${scope}" >> $GITHUB_OUTPUT
           done
           echo "${delimiter}" >> $GITHUB_OUTPUT
           # Create a cache object line if cache_to_scope is set
           if [[ -n "${{ steps.clean.outputs.cache_to_scope }}" ]]; then
-            echo "to=type=gha,mode=max,scope=${{ steps.clean.outputs.cache_to_scope }}" >> $GITHUB_OUTPUT
+            echo "to=type=gha,mode=max,scope=\
+            ${{ steps.clean.outputs.cache_to_scope }}"
+             >> $GITHUB_OUTPUT
           else
             echo "to=" >> $GITHUB_OUTPUT
           fi
@@ -298,7 +310,9 @@ jobs:
           context: .
           file: ${{ inputs.docker_file}}
           labels: ${{ inputs.image_labels }}
-          outputs: type=docker,dest=${{ env.OUTPUT_ARTIFACT_WORK_DIR }}/${{ steps.clean.outputs.image_archive_name_stem }}.tar
+          outputs: >
+            type=docker,dest=${{ env.OUTPUT_ARTIFACT_WORK_DIR }} \
+            ${{ steps.clean.outputs.image_archive_name_stem }}.tar
           platforms: ${{ inputs.platforms }}
           push: false
           tags: ${{ steps.tag_suffix.outputs.tags }}
@@ -309,23 +323,33 @@ jobs:
         run: |
           if [ -n "${{ secrets.image_archive_key }}" ]; then
             echo "do_encryption=true" >> $GITHUB_OUTPUT
-            echo "file_name=${{ steps.clean.outputs.image_archive_name_stem }}.tar.7z" >> $GITHUB_OUTPUT
+            echo "file_name=\
+            ${{ steps.clean.outputs.image_archive_name_stem }}.tar.7z"\
+              >> $GITHUB_OUTPUT
           else
             echo "do_encryption=false" >> $GITHUB_OUTPUT
-            echo "file_name=${{ steps.clean.outputs.image_archive_name_stem }}".tar >> $GITHUB_OUTPUT
+            echo "file_name=\
+            ${{ steps.clean.outputs.image_archive_name_stem }}".tar \
+            >> $GITHUB_OUTPUT
           fi
 
       - name: Encrypt image archive
-        if: ${{ (inputs.push == false) && (steps.check_image_archive_key.outputs.do_encryption == 'true') }}
+        if: >
+         ${{ (inputs.push == false) && \
+         (steps.check_image_archive_key.outputs.do_encryption == 'true') }}
         run: |
           7za a -p${{ secrets.image_archive_key }} \
-          ${{ env.OUTPUT_ARTIFACT_WORK_DIR }}/${{ steps.clean.outputs.image_archive_name_stem }}.tar.7z \
-          ${{ env.OUTPUT_ARTIFACT_WORK_DIR }}/${{ steps.clean.outputs.image_archive_name_stem }}.tar
+          ${{ env.OUTPUT_ARTIFACT_WORK_DIR }}
+          /${{ steps.clean.outputs.image_archive_name_stem }}.tar.7z \
+          ${{ env.OUTPUT_ARTIFACT_WORK_DIR }} \
+          /${{ steps.clean.outputs.image_archive_name_stem }}.tar
 
       - name: Upload artifacts
         if: ${{ (inputs.push == false) && (inputs.artifact_name != '') }}
         uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce
         with:
           name: ${{ inputs.artifact_name }}
-          path: ${{ env.OUTPUT_ARTIFACT_WORK_DIR }}/${{ steps.check_image_archive_key.outputs.file_name }}
+          path: >
+           ${{ env.OUTPUT_ARTIFACT_WORK_DIR }}\
+           /${{ steps.check_image_archive_key.outputs.file_name }}
           retention-days: ${{ inputs.artifact_retention_days }}

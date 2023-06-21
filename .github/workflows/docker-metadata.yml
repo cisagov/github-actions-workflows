@@ -55,10 +55,12 @@ jobs:
       - name: Determine if release is marked as latest
         id: is_latest
         run: |
-          if [ "${{ github.event_name }}" = "release" ] && [ "${{ github.event.release.prerelease }}" = "false" ]; then
+          if [ "${{ github.event_name }}" = "release" ] \
+          && [ "${{ github.event.release.prerelease }}" = "false" ]; then
             # Check to see if this release was designated as the latest release
             latest_release_id=$(curl -s -H "Accept: application/vnd.github+json" \
-                https://api.github.com/repos/${{ github.repository }}/releases/latest | jq .id)
+                https://api.github.com/repos/${{ github.repository }} \
+                /releases/latest | jq .id)
             if [ "$latest_release_id" = "${{ github.event.release.id }}" ]; then
               echo "latest=true" >> $GITHUB_OUTPUT
               exit 0
@@ -76,17 +78,23 @@ jobs:
             ${{ inputs.image_name }}
             ghcr.io/${{ inputs.image_name }}
           labels: |
-            org.opencontainers.image.version=${{ steps.source_values.outputs.source_version }}
+            org.opencontainers.image.version=\
+            ${{ steps.source_values.outputs.source_version }}
           tags: |
             type=edge
             type=raw,value=latest,enable=${{ steps.is_latest.outputs.latest == 'true' }}
-            type=raw,value=prerelease,enable=${{ github.event_name == 'release' && github.event.release.prerelease }}
-            type=raw,value=release,enable=${{ steps.is_latest.outputs.latest == 'true' }}
-            type=raw,event=workflow_dispatch,value=${{ github.event.inputs.dispatch-tag }}
+            type=raw,value=prerelease,enable=${{ github.event_name == \
+            'release' && github.event.release.prerelease }}
+            type=raw,value=release,enable=\
+            ${{ steps.is_latest.outputs.latest == 'true' }}
+            type=raw,event=workflow_dispatch,value=\
+            ${{ github.event.inputs.dispatch-tag }}
             type=ref,event=branch
             type=ref,event=pr
             type=schedule,pattern=nightly
-            type=semver,pattern={{major}},enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
+            type=semver,pattern={{major}},enable=${{ github.event_name \
+            == 'release' && !github.event.release.prerelease }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == \
+            'release' && !github.event.release.prerelease }}
             type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
             type=sha

@@ -32,9 +32,9 @@ permissions:
 jobs:
   config:
     name: "Config"
-    uses: cisagov/github-actions-workflows/.github/workflows/_config.yml@first-commits
+    uses: ./.github/workflows/_config.yml
   lint:
     name: "Lint"
     needs:
       - config
-    uses: cisagov/github-actions-workflows/.github/workflows/common-lint.yml@first-commits
+    uses: ./.github/workflows/common-lint.yml

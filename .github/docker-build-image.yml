@@ -1,0 +1,331 @@
+---
+name: "Build image"
+
+# This reusable workflow builds Docker images.  It allows images to be pushed to
+# Docker Hub and the GitHub Container Registry, or uploaded as an artifact for
+# later use by other workflows.
+#
+# Additional workflow features include:
+# - Caching of Docker layers to Github Actions cache
+# - Optional encryption of Docker images stored as artifacts
+# - Ability to suffix tags with additional information. For example, adding the
+#   platform identifier so the image can be later included in a multi-platform
+#   manifest.
+
+on:
+  workflow_call:
+    inputs:
+      # Required inputs
+      platforms:
+        description: "The platform(s) to build (CSV)"
+        required: true
+        type: string
+      # Optional inputs
+      artifact_name:
+        default: ""
+        description: "Upload the image archive as an artifact if specified"
+        required: false
+        type: string
+      artifact_retention_days:
+        default: 1
+        description: "Number of days to retain the artifact"
+        required: false
+        type: number
+      cache_from_scopes:
+        default: "buildkit"
+        description: "The GitHub Action Cache scopes to read from (name will be cleaned, CSV)"
+        required: false
+        type: string
+      cache_to_scope:
+        default: "buildkit"
+        description: "The GitHub Action Cache scope to write to (name will be cleaned)"
+        required: false
+        type: string
+      docker_file:
+        default: ./Dockerfile
+        description: "The Dockerfile to use"
+        required: false
+        type: string
+      image_labels:
+        description: "Image labels to apply to the image"
+        required: false
+        type: string
+      image_tags:
+        default: ""
+        description: "The tags to apply to the image"
+        required: false
+        type: string
+      image_archive_name_stem:
+        default: image
+        description: "The stem of the image archive name (will be cleaned)"
+        required: false
+        type: string
+      push:
+        default: false
+        description: "Push the image to the registries (disables artifact upload)"
+        required: false
+        type: boolean
+      tag_suffix:
+        default: ""
+        description: "Suffix to append to the image tags (name will be cleaned)"
+        required: false
+        type: string
+      build_arg_1_name:
+        description: "The name of the first build arg"
+        required: false
+        type: string
+      build_arg_2_name:
+        description: "The name of the second build arg"
+        required: false
+        type: string
+      build_arg_3_name:
+        description: "The name of the third build arg"
+        required: false
+        type: string
+      build_arg_4_name:
+        description: "The name of the fourth build arg"
+        required: false
+        type: string
+      build_arg_5_name:
+        description: "The name of the fifth build arg"
+        required: false
+        type: string
+      build_arg_6_name:
+        description: "The name of the sixth build arg"
+        required: false
+        type: string
+      build_arg_7_name:
+        description: "The name of the seventh build arg"
+        required: false
+        type: string
+      build_arg_8_name:
+        description: "The name of the eighth build arg"
+        required: false
+        type: string
+    outputs:
+      image_archive_name:
+        description: "The name of the image archive"
+        value: ${{ jobs.build-image.outputs.image_archive_name }}
+    secrets:
+      image_archive_key:
+        description: "Enables encryption of the image archive if specified"
+        required: false
+      build_arg_1_value:
+        description: "The value of the first build arg"
+        required: false
+      build_arg_2_value:
+        description: "The value of the second build arg"
+        required: false
+      build_arg_3_value:
+        description: "The value of the third build arg"
+        required: false
+      build_arg_4_value:
+        description: "The value of the fourth build arg"
+        required: false
+      build_arg_5_value:
+        description: "The value of the fifth build arg"
+        required: false
+      build_arg_6_value:
+        description: "The value of the sixth build arg"
+        required: false
+      build_arg_7_value:
+        description: "The value of the seventh build arg"
+        required: false
+      build_arg_8_value:
+        description: "The value of the eighth build arg"
+        required: false
+      docker_password:
+        description: "The password for the Docker hub account (required for push)"
+        required: false
+      docker_username:
+        description: "The username for the Docker hub account (required for push)"
+        required: false
+
+env:
+  OUTPUT_ARTIFACT_WORK_DIR: /tmp/output-artifact-work
+
+jobs:
+  build-image:
+    name: "Build image"
+    runs-on: ubuntu-latest
+    outputs:
+      image_archive_name: ${{ steps.check_image_archive_key.outputs.file_name }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2.5.0
+        with:
+          disable-sudo: true
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@v3.5.3
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2.2.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2.9.1
+
+      - name: Docker credentials available for push
+        if: inputs.push == true
+        run: |
+          return_code=0
+          if [ -z "${{ secrets.docker_username }}" ]; then
+            echo "::warning::Set the docker_username secret when using push=true."
+            return_code=1
+          fi
+          if [ -z "${{ secrets.docker_password }}" ]; then
+            echo "::warning::Set the docker_password secret when using push=true."
+            return_code=1
+          fi
+          exit $return_code
+
+      - name: Login to Docker Hub
+        if: inputs.push == true
+        uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc
+        with:
+          username: ${{ secrets.docker_username }}
+          password: ${{ secrets.docker_password }}
+
+      - name: Login to GitHub Container Registry
+        if: inputs.push == true
+        uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create directories for artifact work
+        run: |
+          mkdir -p ${{ env.OUTPUT_ARTIFACT_WORK_DIR }}
+
+      - name: Clean variables
+        id: clean
+        run: |
+          # Replace illegal characters in cache from scope list
+          echo cache_from_scopes=$(echo "${{ inputs.cache_from_scopes }}" | sed -e 's/[^a-zA-Z0-9.,_-]/_/g') >> $GITHUB_OUTPUT
+          # Replace illegal characters in cache to scope
+          echo cache_to_scope=$(echo "${{ inputs.cache_to_scope }}" | sed -e 's/[^a-zA-Z0-9._-]/_/g') >> $GITHUB_OUTPUT
+          # Replace illegal characters in image archive name
+          echo image_archive_name_stem=$(echo "${{ inputs.image_archive_name_stem }}" | sed -e 's/[^a-zA-Z0-9._-]/_/g') >> $GITHUB_OUTPUT
+          # Replace illegal characters in tag suffix
+          echo suffix=$(echo "${{ inputs.tag_suffix }}" | sed -e 's/[^a-zA-Z0-9._-]/_/g') >> $GITHUB_OUTPUT
+
+      - name: Add suffix to image tags
+        id: tag_suffix
+        run: |
+          delimiter="$(openssl rand -hex 8)"
+          echo "tags<<${delimiter}" >> $GITHUB_OUTPUT
+          # if tag_suffix is set, append it to each tag
+          if [[ -n "${{ inputs.tag_suffix }}" ]]; then
+            echo "${{ inputs.image_tags }}" | sed -e "s/$/-${{ steps.clean.outputs.suffix }}/" >> $GITHUB_OUTPUT
+          else
+            echo "${{ inputs.image_tags }}" >> $GITHUB_OUTPUT
+          fi
+          echo "${delimiter}" >> $GITHUB_OUTPUT
+
+      - name: Prepare build args
+        id: prepare-build-args
+        env:
+          ARG_1_NAME: ${{ inputs.build_arg_1_name }}
+          ARG_1_VALUE: ${{ secrets.build_arg_1_value }}
+          ARG_2_NAME: ${{ inputs.build_arg_2_name }}
+          ARG_2_VALUE: ${{ secrets.build_arg_2_value }}
+          ARG_3_NAME: ${{ inputs.build_arg_3_name }}
+          ARG_3_VALUE: ${{ secrets.build_arg_3_value }}
+          ARG_4_NAME: ${{ inputs.build_arg_4_name }}
+          ARG_4_VALUE: ${{ secrets.build_arg_4_value }}
+          ARG_5_NAME: ${{ inputs.build_arg_5_name }}
+          ARG_5_VALUE: ${{ secrets.build_arg_5_value }}
+          ARG_6_NAME: ${{ inputs.build_arg_6_name }}
+          ARG_6_VALUE: ${{ secrets.build_arg_6_value }}
+          ARG_7_NAME: ${{ inputs.build_arg_7_name }}
+          ARG_7_VALUE: ${{ secrets.build_arg_7_value }}
+          ARG_8_NAME: ${{ inputs.build_arg_8_name }}
+          ARG_8_VALUE: ${{ secrets.build_arg_8_value }}
+        run: |
+          delimiter="$(openssl rand -hex 8)"
+          echo "build_args<<${delimiter}" >> $GITHUB_OUTPUT
+          for i in {1..8}; do
+            arg_name_var="ARG_${i}_NAME"
+            arg_value_var="ARG_${i}_VALUE"
+            arg_name=${!arg_name_var}
+            arg_value=${!arg_value_var}
+            if [[ -n "$arg_name" && -n "$arg_value" ]]; then
+              echo "${arg_name}=${arg_value}" >> $GITHUB_OUTPUT
+            fi
+          done
+          echo "${delimiter}" >> $GITHUB_OUTPUT
+
+      - name: Calculate GitHub Actions cache scopes
+        id: cache_scopes
+        run: |
+          # Create a list of cache object lines from the cleaned cache scope CSV
+          delimiter="$(openssl rand -hex 8)"
+          echo "from<<${delimiter}" >> $GITHUB_OUTPUT
+          for scope in $(echo ${{ steps.clean.outputs.cache_from_scopes }} | tr "," " "); do
+            echo "type=gha,scope=${scope}" >> $GITHUB_OUTPUT
+          done
+          echo "${delimiter}" >> $GITHUB_OUTPUT
+          # Create a cache object line if cache_to_scope is set
+          if [[ -n "${{ steps.clean.outputs.cache_to_scope }}" ]]; then
+            echo "to=type=gha,mode=max,scope=${{ steps.clean.outputs.cache_to_scope }}" >> $GITHUB_OUTPUT
+          else
+            echo "to=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build image for push
+        if: inputs.push == true
+        uses: docker/build-push-action@2eb1c1961a95fc15694676618e422e8ba1d63825
+        with:
+          build-args: ${{ steps.prepare-build-args.outputs.build_args }}
+          cache-from: ${{ steps.cache_scopes.outputs.from }}
+          cache-to: ${{ steps.cache_scopes.outputs.to }}
+          context: .
+          file: ${{ inputs.docker_file}}
+          labels: ${{ inputs.image_labels }}
+          platforms: ${{ inputs.platforms }}
+          push: true
+          tags: ${{ steps.tag_suffix.outputs.tags }}
+
+      - name: Build image for archive
+        if: inputs.push == false
+        uses: docker/build-push-action@2eb1c1961a95fc15694676618e422e8ba1d63825
+        with:
+          build-args: ${{ steps.prepare-build-args.outputs.build_args }}
+          cache-from: ${{ steps.cache_scopes.outputs.from }}
+          cache-to: ${{ steps.cache_scopes.outputs.to }}
+          context: .
+          file: ${{ inputs.docker_file}}
+          labels: ${{ inputs.image_labels }}
+          outputs: type=docker,dest=${{ env.OUTPUT_ARTIFACT_WORK_DIR }}/${{ steps.clean.outputs.image_archive_name_stem }}.tar
+          platforms: ${{ inputs.platforms }}
+          push: false
+          tags: ${{ steps.tag_suffix.outputs.tags }}
+
+      - name: Check if archive key is available
+        id: check_image_archive_key
+        if: inputs.push == false
+        run: |
+          if [ -n "${{ secrets.image_archive_key }}" ]; then
+            echo "do_encryption=true" >> $GITHUB_OUTPUT
+            echo "file_name=${{ steps.clean.outputs.image_archive_name_stem }}.tar.7z" >> $GITHUB_OUTPUT
+          else
+            echo "do_encryption=false" >> $GITHUB_OUTPUT
+            echo "file_name=${{ steps.clean.outputs.image_archive_name_stem }}".tar >> $GITHUB_OUTPUT
+          fi
+
+      - name: Encrypt image archive
+        if: ${{ (inputs.push == false) && (steps.check_image_archive_key.outputs.do_encryption == 'true') }}
+        run: |
+          7za a -p${{ secrets.image_archive_key }} \
+          ${{ env.OUTPUT_ARTIFACT_WORK_DIR }}/${{ steps.clean.outputs.image_archive_name_stem }}.tar.7z \
+          ${{ env.OUTPUT_ARTIFACT_WORK_DIR }}/${{ steps.clean.outputs.image_archive_name_stem }}.tar
+
+      - name: Upload artifacts
+        if: ${{ (inputs.push == false) && (inputs.artifact_name != '') }}
+        uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ env.OUTPUT_ARTIFACT_WORK_DIR }}/${{ steps.check_image_archive_key.outputs.file_name }}
+          retention-days: ${{ inputs.artifact_retention_days }}

@@ -1,0 +1,112 @@
+---
+name: "Generate SBOMs"
+
+# This reusable workflow creates a Software Bill of Materials (SBOM) for a all
+# images in a workflow artifact.  It allows the SBOMs to be uploaded as a
+# workflow artifact, or uploaded as a release asset.
+
+on:
+  workflow_call:
+    inputs:
+      # Required inputs
+      image_artifact_name:
+        description: "The name of the artifact containing the image archives"
+        required: true
+        type: string
+      # Optional inputs
+      artifact_retention_days:
+        default: 28
+        description: "Number of days to retain the sbom artifacts"
+        required: false
+        type: number
+      sbom_artifact_name:
+        default: "sboms"
+        description: "The name of the artifact to store the SBOMs"
+        required: false
+        type: string
+      syft_version:
+        default: "v0.76.0"
+        description: "The version of syft to use"
+        required: false
+        type: string
+
+permissions:  # added using https://github.com/step-security/secure-repo
+  contents: read
+
+env:
+  OUTPUT_ARTIFACT_WORK_DIR: /tmp/output-artifact-work
+
+jobs:
+  generate-sbom:
+    permissions:
+      contents: write
+    name: "Generate SBOMs"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2.5.0
+        with:
+          disable-sudo: true
+          egress-policy: audit
+
+      - name: Install syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | \
+            sh -s -- -b /usr/local/bin ${{ inputs.syft_version }}
+
+      - name: Create directories for artifact work
+        run: |
+          mkdir -p ${{ env.OUTPUT_ARTIFACT_WORK_DIR }}
+
+      - name: Clean variables
+        id: clean
+        run: |
+          # Replace illegal characters in repository name
+          echo repository=$(echo "${{ github.repository }}" | sed -e 's/[^a-zA-Z0-9._-]/_/g') >> $GITHUB_OUTPUT
+          # Replace illegal characters in ref_name
+          echo ref_name=$(echo "${{ github.ref_name }}" | sed -e 's/[^a-zA-Z0-9._-]/_/g') >> $GITHUB_OUTPUT
+
+      - name: Calculate file variables
+        # If this is a release, the version will be the clean ref_name.  Otherwise it will be the short SHA.
+        id: calc
+        run: |
+          if [[ "${{ github.ref }}" == "refs/tags/"* ]]; then
+            echo version=${{ steps.clean.outputs.ref_name }} >> $GITHUB_OUTPUT
+          else
+            echo version=$(echo "${{ github.sha }}" | cut -c1-7) >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download images artifact
+        uses: actions/download-artifact@v3.0.2
+        with:
+          name: ${{ inputs.image_artifact_name }}
+
+      - name: Generate SBOMs
+        run: |
+          for image_archive in $(find . -name "*.tar"); do
+            platform=$(basename $image_archive .tar)
+            filename=${{ steps.clean.outputs.repository }}-${platform}-${{ steps.calc.outputs.version }}-sbom.spdx.json
+            echo "::group::Generating SBOM $filename for $image_archive"
+            syft --verbose=2 --output spdx-json $image_archive > ${{ env.OUTPUT_ARTIFACT_WORK_DIR }}/$filename
+            echo "::endgroup::"
+          done
+
+      - name: Upload SBOMs as artifact
+        uses: actions/upload-artifact@v3.1.2
+        with:
+          name: ${{ inputs.sbom_artifact_name }}
+          path: ${{ env.OUTPUT_ARTIFACT_WORK_DIR }}
+          retention-days: ${{ inputs.artifact_retention_days }}
+
+      # If this is a release, attach the SBOMs as release assets.
+      # The gh command requires a repository to be checked out.
+      - name: Checkout source
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/checkout@v3.5.3
+
+      - name: Upload SBOMs as release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ github.ref_name }} ${{ env.OUTPUT_ARTIFACT_WORK_DIR }}/* --clobber
